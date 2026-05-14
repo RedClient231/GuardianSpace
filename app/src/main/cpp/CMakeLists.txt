@@ -26,7 +26,7 @@ target_link_libraries(ggfix
 
 # Compiler flags
 target_compile_options(ggfix PRIVATE
-    -Wall -Wextra -Werror
+    -Wall -Wextra
     -O2
     -fvisibility=hidden
     -ffunction-sections

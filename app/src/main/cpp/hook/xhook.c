@@ -115,7 +115,7 @@ static void **find_got_entry(const char *lib_path, const char *symbol) {
  * Hook a function by name using GOT/PLT patching.
  * This modifies the Global Offset Table entry for the target function.
  */
-int xhook_register(const char *lib_name, const char *symbol_name, void *new_func, void **orig_func) {
+int xhook_register(const char * /*lib_name*/, const char *symbol_name, void *new_func, void **orig_func) {
     if (g_hook_count >= MAX_HOOKS) {
         LOGE("Hook table full");
         return -1;
@@ -147,7 +147,7 @@ int xhook_register(const char *lib_name, const char *symbol_name, void *new_func
  * Apply all registered hooks.
  * Scans /proc/self/maps for loaded libraries and patches GOT entries.
  */
-int xhook_refresh(int async) {
+int xhook_refresh(int /*async*/) {
     if (!g_initialized) {
         LOGI("xhook initialized");
         g_initialized = 1;

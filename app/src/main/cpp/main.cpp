@@ -7,6 +7,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <dlfcn.h>
+#include <sys/types.h>
 
 #define LOG_TAG "GGFixMain"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -43,10 +44,9 @@ static void on_library_unload(void) {
 }
 
 // JNI bridge for GG_Patcher.java
-// Method name: nativeHookGG(String)
 extern "C" JNIEXPORT void JNICALL
 Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeHookGG(
-    JNIEnv *env, jobject thiz, jstring packageName) {
+    JNIEnv *env, jobject /*thiz*/, jstring packageName) {
     const char *pkg = env->GetStringUTFChars(packageName, nullptr);
     LOGI("Native hook GG for package: %s", pkg);
     xhook_install_gg_hooks();
@@ -54,28 +54,25 @@ Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeHookGG(
     env->ReleaseStringUTFChars(packageName, pkg);
 }
 
-// Method name: nativeApplyTimeHook()
 extern "C" JNIEXPORT void JNICALL
 Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeApplyTimeHook(
-    JNIEnv *env, jobject thiz) {
+    JNIEnv * /*env*/, jobject /*thiz*/) {
     LOGI("Applying time hook for speed hack");
     gg_enable_speedhack(1.0);
 }
 
-// Method name: nativeUnhookGG(String)
 extern "C" JNIEXPORT void JNICALL
 Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeUnhookGG(
-    JNIEnv *env, jobject thiz, jstring packageName) {
+    JNIEnv *env, jobject /*thiz*/, jstring packageName) {
     const char *pkg = env->GetStringUTFChars(packageName, nullptr);
     LOGI("Unhooking GG for package: %s", pkg);
     gg_disable_speedhack();
     env->ReleaseStringUTFChars(packageName, pkg);
 }
 
-// Method name: nativeInit(String)
 extern "C" JNIEXPORT jint JNICALL
 Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeInit(
-    JNIEnv *env, jobject thiz, jstring packageName) {
+    JNIEnv *env, jobject /*thiz*/, jstring packageName) {
     const char *pkg = env->GetStringUTFChars(packageName, nullptr);
     LOGI("Initializing GG fix for: %s", pkg);
     xhook_install_gg_hooks();
@@ -84,10 +81,9 @@ Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeInit(
     return 0;
 }
 
-// Method name: nativeSetSpeed(float)
 extern "C" JNIEXPORT void JNICALL
 Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeSetSpeed(
-    JNIEnv *env, jobject thiz, jfloat multiplier) {
+    JNIEnv * /*env*/, jobject /*thiz*/, jfloat multiplier) {
     LOGI("Speed hack set to: %.1fx", multiplier);
     if (multiplier <= 0) {
         gg_disable_speedhack();
@@ -96,16 +92,14 @@ Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeSetSpeed(
     }
 }
 
-// Method name: nativeIsHooked()
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeIsHooked(
-    JNIEnv *env, jobject thiz) {
+    JNIEnv * /*env*/, jobject /*thiz*/) {
     return JNI_TRUE;
 }
 
-// Method name: nativeGetVersion()
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_tools_vspace_engine_patch_GG_1Patcher_nativeGetVersion(
-    JNIEnv *env, jobject thiz) {
+    JNIEnv *env, jobject /*thiz*/) {
     return env->NewStringUTF("1.0.0-ggfix");
 }

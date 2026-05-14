@@ -45,6 +45,7 @@ static void get_monotonic_time(struct timespec *ts) {
  * Instead of blocking gettimeofday (which crashes), we calculate
  * the delta from base time and apply the speed multiplier.
  */
+__attribute__((used))
 static void apply_speed_delta(struct timespec *result) {
     struct timespec now;
     get_monotonic_time(&now);
@@ -86,6 +87,9 @@ void gg_enable_speedhack(double multiplier) {
     g_speed_multiplier = multiplier;
     get_monotonic_time(&g_base_time);
     g_time_initialized = 1;
+    // Initialize offset with first delta calculation
+    struct timespec ts;
+    apply_speed_delta(&ts);
     LOGI("Speed hack enabled: %.1fx", multiplier);
 }
 

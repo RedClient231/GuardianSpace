@@ -1,0 +1,30 @@
+# GuardianSpace Root Emulation Configuration
+# This file configures how root access is emulated in the virtual environment
+
+# Virtual su binary paths
+su_paths=/system/bin/su,/system/xbin/su,/sbin/su,/data/local/su
+
+# Emulation mode: full|limited|passthrough
+emulation_mode=full
+
+# Allow process scanning (required for GameGuardian)
+allow_ptrace=true
+
+# Allow memory modification (required for GameGuardian)
+allow_mprotect=true
+
+# Speed hack support
+speedhack_enabled=true
+
+# Device spoofing
+spoof_device=true
+spoof_model=Pixel 5
+spoof_manufacturer=Google
+spoof_brand=google
+spoof_fingerprint=google/redfin/redfin:11/RQ3A.211001.001/7641976:userdebug/dev-keys
+
+# Anti-detection
+hide_virtual_packages=true
+hide_xposed=true
+hide_magisk=true
+hide_substrate=true

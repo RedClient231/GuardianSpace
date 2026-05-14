@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GuardianSpace</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_apps">Apps</string>
+    <string name="add_app">Add APK</string>
+    <string name="launch">Launch</string>
+    <string name="delete">Delete</string>
+    <string name="no_apps">No apps installed yet.\nTap + to add an APK.</string>
+    <string name="installing">Installing in virtual space...</string>
+    <string name="install_success">App installed successfully</string>
+    <string name="install_failed">Installation failed</string>
+    <string name="gg_detected">GameGuardian detected and patched</string>
+</resources>

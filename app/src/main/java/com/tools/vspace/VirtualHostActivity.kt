@@ -27,7 +27,6 @@ class VirtualHostActivity : Activity() {
 
     private var targetPackageName: String? = null
     private var targetApkPath: String? = null
-    private var hostedView: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,8 +61,6 @@ class VirtualHostActivity : Activity() {
             val virtualApp = vc.getVirtualApp(targetPackageName!!) ?: return false
 
             val classLoader = virtualApp.classLoader ?: return false
-            val resources = virtualApp.resources ?: return false
-            val appInfo = virtualApp.appInfo ?: return false
 
             // Parse the APK to find the launcher Activity
             val pm = packageManager
@@ -79,77 +76,43 @@ class VirtualHostActivity : Activity() {
             }
 
             // Find the launcher activity
-            var launcherActivity: ActivityInfo? = null
+            var launcherActivityName: String? = null
             for (activity in activities) {
-                val intentFilter = pm.getActivityInfo(
-                    ComponentName(targetPackageName!!, activity.name), 0
-                )
-                // Check if this is the main/launcher activity
                 if (activity.name.contains("Main", ignoreCase = true) ||
                     activity.name.contains("Launch", ignoreCase = true) ||
                     activity.name.contains("Splash", ignoreCase = true)) {
-                    launcherActivity = activity
+                    launcherActivityName = activity.name
                     break
                 }
             }
 
             // If no obvious launcher found, use the first activity
-            if (launcherActivity == null) {
-                launcherActivity = activities[0]
+            if (launcherActivityName == null) {
+                launcherActivityName = activities[0]?.name
             }
 
-            Log.i(TAG, "Loading Activity: ${launcherActivity.name}")
+            if (launcherActivityName == null) {
+                Log.w(TAG, "Could not determine launcher activity")
+                return false
+            }
+
+            Log.i(TAG, "Loading Activity: $launcherActivityName")
 
             // Load the Activity class using the APK's classloader
-            val activityClass = classLoader.loadClass(launcherActivity.name)
+            val activityClass = classLoader.loadClass(launcherActivityName)
 
-            // Create an instance of the target Activity
-            val targetActivity = activityClass.newInstance() as? Activity
+            // Launch via intent
+            val launchIntent = Intent().apply {
+                setClassName(targetPackageName!!, launcherActivityName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
 
-            if (targetActivity != null) {
-                // Set up the activity with our context
-                // The activity will run inside our process
+            try {
+                startActivity(launchIntent)
                 Toast.makeText(this, "Launching inside virtual space...", Toast.LENGTH_SHORT).show()
-
-                // Launch via intent with the target activity class
-                val launchIntent = Intent().apply {
-                    setClassName(targetPackageName!!, launcherActivity.name)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-
-                try {
-                    startActivity(launchIntent)
-                    return true
-                } catch (e: Exception) {
-                    Log.w(TAG, "Direct launch failed, trying reflection: ${e.message}")
-                }
-
-                // Fallback: use reflection to call onCreate
-                try {
-                    val attachMethod = Activity::class.java.getDeclaredMethod(
-                        "attach",
-                        android.content.Context::class.java,
-                        android.app.Instrumentation::class.java,
-                        android.app.Application::class.java,
-                        android.os.IBinder::class.java,
-                        android.app.Application::class.java,
-                        Intent::class.java,
-                        ActivityInfo::class.java,
-                        CharSequence::class.java,
-                        Activity::class.java,
-                        String::class.java,
-                        android.app.ActivityThread::class.java,
-                        android.content.res.Configuration::class.java
-                    )
-                    attachMethod.isAccessible = true
-
-                    // This is complex - fall back to showing the container
-                    Log.w(TAG, "Reflection attach too complex, using container")
-                    return false
-                } catch (e: Exception) {
-                    Log.e(TAG, "Reflection failed: ${e.message}")
-                    return false
-                }
+                return true
+            } catch (e: Exception) {
+                Log.w(TAG, "Direct launch failed: ${e.message}")
             }
 
             return false
@@ -186,14 +149,13 @@ class VirtualHostActivity : Activity() {
         container.addView(infoText)
         setContentView(container)
 
-        // Also try to load the app's main layout
+        // Try to load the app's main layout
         try {
             val vc = VirtualCore.get(this)
             val virtualApp = vc.getVirtualApp(targetPackageName!!)
             val resources = virtualApp?.resources
 
             if (resources != null) {
-                // Try to find and inflate the app's main layout
                 val layoutId = resources.getIdentifier("activity_main", "layout", targetPackageName)
                 if (layoutId != 0) {
                     try {

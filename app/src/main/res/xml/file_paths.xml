@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="virtual_apks" path="virtual_apks/" />
+    <files-path name="apk_files" path="." />
+    <cache-path name="cache" path="." />
+</paths>

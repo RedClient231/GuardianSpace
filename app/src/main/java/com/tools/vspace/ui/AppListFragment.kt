@@ -62,11 +62,17 @@ class AppListFragment : Fragment() {
 
             adapter = AppListAdapter(apps,
                 onLaunch = { app ->
-                    vc.launchApp(app.packageName)
-                    Toast.makeText(requireContext(), "Launching ${app.appName}...", Toast.LENGTH_SHORT).show()
+                    val success = vc.launchApp(app.packageName)
+                    if (success) {
+                        Toast.makeText(requireContext(), "Launching ${app.appName}...", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to launch ${app.appName}", Toast.LENGTH_SHORT).show()
+                    }
                 },
                 onDelete = { app ->
+                    vc.removeApp(app.packageName)
                     Toast.makeText(requireContext(), "${app.appName} removed from virtual space", Toast.LENGTH_SHORT).show()
+                    loadApps() // Refresh the list
                 }
             )
             recyclerView.adapter = adapter

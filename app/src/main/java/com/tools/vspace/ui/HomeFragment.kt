@@ -58,7 +58,10 @@ class HomeFragment : Fragment() {
                     if (ggCount > 0) " • $ggCount GameGuardian instance(s)" else ""
 
             adapter = HomeAppAdapter(apps) { app ->
-                vc.launchApp(app.packageName)
+                val success = vc.launchApp(app.packageName)
+                if (!success) {
+                    android.widget.Toast.makeText(requireContext(), "Failed to launch ${app.appName}", android.widget.Toast.LENGTH_SHORT).show()
+                }
             }
             recyclerView.adapter = adapter
         }

@@ -3,9 +3,11 @@ package com.tools.vspace
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.util.Log
 import com.tools.vspace.blackbox.BlackBoxEngine
 import com.tools.vspace.engine.BlackBoxCore
@@ -13,6 +15,7 @@ import com.tools.vspace.engine.VEnvironment
 import com.tools.vspace.engine.patch.GG_Patcher
 import com.tools.vspace.engine.patch.RootEmu
 import java.io.File
+import java.io.FileInputStream
 
 /**
  * Central controller for the Virtual Space.
@@ -83,7 +86,8 @@ class VirtualCore private constructor(private val context: Context) {
     }
 
     /**
-     * Install an APK into the virtual space
+     * Install an APK into the virtual space.
+     * Copies the APK to internal storage and registers it for launching.
      */
     fun installApk(apkPath: String): Boolean {
         if (!isInitialized) {
@@ -110,19 +114,22 @@ class VirtualCore private constructor(private val context: Context) {
             val isGG = packageInfo.packageName.contains("catcher") ||
                        appName.contains("Guardian", ignoreCase = true)
 
+            // Copy APK to our internal storage for reliable access
+            val internalApk = copyApkToInternal(apkPath, packageInfo.packageName)
+
             val virtualApp = VirtualApp(
                 packageName = packageInfo.packageName,
                 appName = appName,
-                apkPath = apkPath,
+                apkPath = internalApk ?: apkPath,
                 icon = icon,
                 isGameGuardian = isGG
             )
 
             installedApps.add(virtualApp)
 
-            // Create virtual process
+            // Register with BlackBox engine
             val uid = 10000 + installedApps.size
-            blackBoxEngine.createVirtualProcess(packageInfo.packageName, apkPath, uid)
+            blackBoxEngine.createVirtualProcess(packageInfo.packageName, virtualApp.apkPath, uid)
 
             // If this is GameGuardian, apply patches
             if (isGG) {
@@ -138,7 +145,29 @@ class VirtualCore private constructor(private val context: Context) {
     }
 
     /**
-     * Launch an app in the virtual space
+     * Copy APK to internal storage for reliable access
+     */
+    private fun copyApkToInternal(sourcePath: String, packageName: String): String? {
+        return try {
+            val destDir = File(context.filesDir, "virtual_apks")
+            destDir.mkdirs()
+            val destFile = File(destDir, "$packageName.apk")
+
+            // Only copy if source is different from dest
+            if (sourcePath != destFile.absolutePath) {
+                val source = File(sourcePath)
+                source.copyTo(destFile, overwrite = true)
+            }
+            destFile.absolutePath
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to copy APK to internal storage", e)
+            null
+        }
+    }
+
+    /**
+     * Launch an app in the virtual space.
+     * Installs the APK on the device and launches it.
      */
     fun launchApp(packageName: String): Boolean {
         val app = installedApps.find { it.packageName == packageName }
@@ -151,18 +180,27 @@ class VirtualCore private constructor(private val context: Context) {
             // Apply root emulation for this app
             rootEmu.enableForPackage(packageName)
 
-            // Create virtual process
-            val pid = blackBoxEngine.createVirtualProcess(
+            // Apply build spoofing
+            blackBoxCore.applyBuildSpoof()
+
+            // Register with BlackBox engine
+            blackBoxEngine.createVirtualProcess(
                 packageName, app.apkPath, 10000 + installedApps.indexOf(app)
             )
 
-            if (pid > 0) {
-                Log.i(TAG, "Launched virtual app: ${app.appName} (pid=$pid)")
-                true
+            // Check if app is already installed on device
+            val isInstalled = isAppInstalled(packageName)
+
+            if (isInstalled) {
+                // App already installed, just launch it
+                launchInstalledApp(packageName)
             } else {
-                Log.e(TAG, "Failed to create virtual process for $packageName")
-                false
+                // Need to install the APK first, then launch
+                installAndLaunchApk(app.apkPath, packageName)
             }
+
+            Log.i(TAG, "Launched virtual app: ${app.appName}")
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Launch failed", e)
             false
@@ -170,9 +208,106 @@ class VirtualCore private constructor(private val context: Context) {
     }
 
     /**
+     * Check if an app is installed on the device
+     */
+    private fun isAppInstalled(packageName: String): Boolean {
+        return try {
+            context.packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
+    /**
+     * Launch an already installed app
+     */
+    private fun launchInstalledApp(packageName: String) {
+        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            Log.i(TAG, "Launched installed app: $packageName")
+        } else {
+            Log.e(TAG, "No launch intent for: $packageName")
+        }
+    }
+
+    /**
+     * Install APK and launch it.
+     * Uses ACTION_VIEW to trigger the system package installer.
+     */
+    private fun installAndLaunchApk(apkPath: String, packageName: String) {
+        val apkFile = File(apkPath)
+        if (!apkFile.exists()) {
+            Log.e(TAG, "APK file not found: $apkPath")
+            return
+        }
+
+        // Use the system installer
+        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            // For Android 7.0+ use FileProvider
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+        } else {
+            Uri.fromFile(apkFile)
+        }
+
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        try {
+            context.startActivity(intent)
+            Log.i(TAG, "Started APK installation for: $packageName")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start APK installation", e)
+            // Fallback: try with file:// URI
+            try {
+                val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(
+                        Uri.fromFile(apkFile),
+                        "application/vnd.android.package-archive"
+                    )
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(fallbackIntent)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Fallback installation also failed", e2)
+            }
+        }
+    }
+
+    /**
      * Get list of installed virtual apps
      */
     fun getInstalledApps(): List<VirtualApp> = installedApps.toList()
+
+    /**
+     * Remove an app from the virtual space
+     */
+    fun removeApp(packageName: String): Boolean {
+        val app = installedApps.find { it.packageName == packageName }
+        if (app == null) return false
+
+        // Remove from list
+        installedApps.remove(app)
+
+        // Try to delete the internal APK copy
+        try {
+            File(app.apkPath).delete()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to delete APK: ${e.message}")
+        }
+
+        Log.i(TAG, "Removed virtual app: $packageName")
+        return true
+    }
 
     /**
      * Check if an APK is GameGuardian

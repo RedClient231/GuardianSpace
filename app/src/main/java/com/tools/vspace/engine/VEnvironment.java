@@ -19,9 +19,45 @@ public class VEnvironment {
     private final Context context;
     private final Map<String, String> virtualProps = new HashMap<>();
 
+    /**
+     * Device spoof configuration data class
+     */
+    public static class DeviceSpoof {
+        public final String model;
+        public final String manufacturer;
+        public final String brand;
+
+        public DeviceSpoof(String model, String manufacturer, String brand) {
+            this.model = model;
+            this.manufacturer = manufacturer;
+            this.brand = brand;
+        }
+    }
+
     public VEnvironment(Context context) {
         this.context = context;
         initVirtualProps();
+    }
+
+    /**
+     * Initialize the virtual environment
+     */
+    public void initialize() {
+        // Ensure virtual data directories exist
+        getVirtualDataDir("system");
+        getVirtualBinDir();
+        Log.i(TAG, "VEnvironment initialized");
+    }
+
+    /**
+     * Get the current device spoof configuration
+     */
+    public DeviceSpoof getDeviceSpoof() {
+        return new DeviceSpoof(
+            virtualProps.getOrDefault("ro.product.model", "Pixel 5"),
+            virtualProps.getOrDefault("ro.product.manufacturer", "Google"),
+            virtualProps.getOrDefault("ro.product.brand", "google")
+        );
     }
 
     private void initVirtualProps() {

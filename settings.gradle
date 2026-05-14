@@ -1,0 +1,3 @@
+rootProject.name = 'GuardianSpace'
+include ':app'
+include ':blackbox-core'
